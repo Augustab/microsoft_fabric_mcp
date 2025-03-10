@@ -1,44 +1,12 @@
-# Data Engineering Toolkit
+# Microsoft Fabric MCP
 
-A collection of tools, utilities, and code snippets to assist with data engineering tasks. This repository provides reusable components to streamline common data engineering workflows.
+## Introduction
 
-## Repository Structure
+This MCP server is created to make it easier for data engineers working in Microsoft Fabric to use generative AI tools without requiring access to Microsoft Fabric Copilot (F64), which can be prohibitively expensive for many organizations.
 
-```
-coding-assistant-tips/
-├── .python-version                       # Python version specifier for this project
-├── extract_lakehouse_delta_schemas.py    # Tool to extract Delta table schemas from Fabric lakehouses
-├── fabric_mcp.py                         # MCP server implementation for Fabric API integration
-├── main.py                               # Simple entry point for the project
-├── pyproject.toml                        # Project dependencies and metadata
-├── README.md                             # Documentation and usage guide (this file)
-└── uv.lock                               # Dependency lock file for UV package manager
-```
+We have built MCP tools around the endpoints available in the Fabric REST API. Currently, we've focused on providing schema information for tables in lakehouses, but we plan to expand with more tools covering additional Fabric REST API endpoints as listed in the [Microsoft Fabric REST API documentation](https://learn.microsoft.com/en-us/rest/api/fabric/articles/).
 
-## Important Note
-
-The `fabric_mcp.py` builds a MCP based on the `extract_lakehouse_delta_schemas.py` file. We have kept the `extract_lakehouse_delta_schemas.py` if one does not want to use the MCP.
-
-## Available Tools
-
-### Delta Schema Extractor
-
-The `extract_lakehouse_delta_schemas.py` script extracts schema information from Delta tables in Microsoft Fabric lakehouses and generates markdown documentation. This tool helps data engineers document their data assets and understand the structure of their Delta tables.
-
-#### Features:
-- Connects to Microsoft Fabric API using Azure credentials
-- Extracts schema and metadata from Delta tables
-- Generates comprehensive markdown documentation
-- Supports filtering by specific lakehouses
-- Configurable verbosity levels for debugging
-
-#### Usage:
-```bash
-az login --tenant <tenant_id>
-python extract_lakehouse_delta_schemas.py -w <workspace_name> [-l <lakehouse1> <lakehouse2>] [-o <output_dir>] [-v]
-```
-
-# MCP
+By leveraging these tools, data engineers can enhance their productivity and gain AI assistance capabilities without the need for premium licensing.
 
 ## Getting Started
 
@@ -56,10 +24,9 @@ After cloning this repository, follow these steps to set up the UV project:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-2. Create a virtual environment and install dependencies:
+2. Create a virtual environment:
 ```bash
 uv venv
-uv pip install -e .
 ```
 
 3. Activate the virtual environment:
@@ -70,6 +37,17 @@ source .venv/bin/activate
 # On Windows
 .venv\Scripts\activate
 ```
+
+4. Install dependencies:
+```bash
+uv pip install -e .
+```
+
+5. Verify installation:
+```bash
+uv run fabric_mcp.py
+```
+This confirms that everything is working correctly.
 
 ## Azure CLI Authentication
 
@@ -104,7 +82,7 @@ When this is done, the `DefaultAzureCredential` in our code will automatically f
 
 ## Setting up MCP
 
-To use the MCP (Model Composition Platform) with this toolkit, follow these steps:
+To use the MCP (Module Context Protocol) with this toolkit, follow these steps:
 
 1. Make sure you have completed the UV setup and Azure CLI authentication steps above.
 

@@ -1,5 +1,5 @@
 def main():
-    print("Hello from coding-assistant-tips!")
+    print("fabric_mcp!")
 
 
 if __name__ == "__main__":

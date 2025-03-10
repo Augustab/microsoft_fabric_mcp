@@ -1,7 +1,7 @@
 [project]
-name = "coding-assistant-tips"
+name = "fabric_mcp"
 version = "0.1.0"
-description = "Evidis first Fabric MCP"
+description = "Evidis first Fabric MCP - Created by August Asheim Birkeland and Erlend Øien"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -10,3 +10,6 @@ dependencies = [
     "mcp[cli]>=1.3.0",
     "requests>=2.32.3",
 ]
+
+[tool.setuptools]
+py-modules = ["fabric_mcp"]
