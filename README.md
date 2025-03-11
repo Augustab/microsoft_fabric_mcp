@@ -21,7 +21,11 @@ After cloning this repository, follow these steps to set up the UV project:
 
 1. Install UV (if not already installed):
 ```bash
+# On macOS/Linux
 curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# On Windows (using PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
 2. Create a virtual environment:
@@ -59,6 +63,11 @@ This toolkit requires Azure CLI to be installed and properly configured for auth
 ```bash
 # For macOS
 brew install azure-cli
+
+# For Windows
+# Last ned installasjonen fra: https://aka.ms/installazurecliwindows
+# Eller bruk winget:
+winget install -e --id Microsoft.AzureCLI
 
 # For other platforms, see the official Azure CLI documentation
 ```
@@ -105,4 +114,3 @@ Replace `PATH_TO_YOUR_FOLDER` with the path to the folder containing this toolki
 ## Contributing
 
 Feel free to contribute additional tools, utilities, or improvements to existing code. Please follow the existing code structure and include appropriate documentation.
-
