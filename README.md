@@ -192,7 +192,23 @@ Can you list my workspaces in Fabric?
 
 The LLM will automatically understand which MCP tool to use based on your query. It will invoke the `list_workspaces` tool and display the results:
 
-![Example of listing Fabric workspaces](images/list_workspaces_example.png "Example of listing workspaces in Fabric")
+<img src="images/list_workspaces_example.png" alt="Example of listing Fabric workspaces" title="Example of listing workspaces in Fabric" width="600" />
+
+### Advanced Use Cases
+
+The main advantage of this MCP integration becomes clear when working with more complex tasks. For example, you can ask Claude to create a notebook that reads data from a specific table in one lakehouse and upserts it into another table in a silver lakehouse:
+
+```
+Can you create a notebook that reads data from the 'sales' table in the Bronze lakehouse and upserts it into the 'sales_processed' table in the Silver lakehouse? The notebook should take into consideration the schema of both tables.
+```
+
+In this scenario, Claude can use the MCP tools to:
+1. Get the schema information for both tables
+2. Understand the data structure and relationships
+3. Generate appropriate code that handles data types correctly
+4. Create an efficient upsert operation based on the actual table schemas
+
+This level of context-aware assistance would be impossible without the MCP integration giving Claude access to your actual Fabric resources and schemas.
 
 ### Permission Handling
 
