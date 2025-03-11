@@ -192,7 +192,9 @@ Can you list my workspaces in Fabric?
 
 The LLM will automatically understand which MCP tool to use based on your query. It will invoke the `list_workspaces` tool and display the results:
 
-<img src="images/list_workspaces_example.png" alt="Example of listing Fabric workspaces" title="Example of listing workspaces in Fabric" width="600" />
+<div align="center">
+  <img src="images/list_workspaces_example.png" alt="Example of listing Fabric workspaces" title="Example of listing workspaces in Fabric" width="450" />
+</div>
 
 ### Advanced Use Cases
 
