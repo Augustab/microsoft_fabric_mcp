@@ -2,11 +2,32 @@
 
 ## Introduction
 
-This MCP server is created to make it easier for data engineers working in Microsoft Fabric to use generative AI tools without requiring access to Microsoft Fabric Copilot (F64), which can be prohibitively expensive for many organizations.
+This MCP server is created to make it easier for data engineers working in Microsoft Fabric to use generative AI tools without requiring access to Microsoft Fabric Copilot (which demands F64-capacity), which can be prohibitively expensive for many organizations.
 
-We have built MCP tools around the endpoints available in the Fabric REST API. Currently, we've focused on providing schema information for tables in lakehouses, but we plan to expand with more tools covering additional Fabric REST API endpoints as listed in the [Microsoft Fabric REST API documentation](https://learn.microsoft.com/en-us/rest/api/fabric/articles/).
+We have built MCP tools around the endpoints available in the Fabric REST API. Currently, we've focused on providing schema information for tables in lakehouses, but we plan to expand with more tools covering additional Fabric REST API endpoints as listed in the [Microsoft Fabric REST API documentation](https://learn.microsoft.com/en-us/rest/api/fabric/articles/) as well as the [Azure Data Lake Storage Gen2 REST API documentation](https://learn.microsoft.com/en-us/rest/api/storageservices/data-lake-storage-gen2)
 
 By leveraging these tools, data engineers can enhance their productivity and gain AI assistance capabilities without the need for premium licensing.
+
+## What is Model Context Protocol (MCP)?
+
+The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context to Large Language Models (LLMs). Think of MCP like a standardized connection port for AI applications - it provides a standardized way to connect AI models to different data sources and tools.
+x
+### How MCP Works
+
+MCP follows a client-server architecture:
+
+- **MCP Hosts**: Programs like Cursor IDE, Windsurf, Claude CLI, or other AI tools that want to access data through MCP
+- **MCP Clients**: Protocol clients that maintain connections with servers
+- **MCP Servers**: Lightweight programs (like this Microsoft Fabric MCP) that expose specific capabilities through the standardized protocol
+- **Data Sources**: Your Fabric resources, databases, and other services that MCP servers can securely access
+
+This architecture allows LLMs to interact with your data and tools in a standardized way, making it possible to:
+
+1. Connect to pre-built integrations that your LLM can directly use
+2. Maintain flexibility to switch between LLM providers
+3. Keep your data secure within your infrastructure
+
+For this project, we recommend using Cursor as your IDE for the best experience, though Windsurf and Claude CLI are also compatible options.
 
 ## Getting Started
 
@@ -110,6 +131,76 @@ Replace `PATH_TO_YOUR_FOLDER` with the path to the folder containing this toolki
 3. Once the MCP is configured, you can interact with Microsoft Fabric resources directly from your tools and applications.
 
 4. You can use the provided MCP tools to list workspaces, lakehouses, and tables, as well as extract schema information as documented in the tools section.
+
+5. When successfully configured, your MCP will appear in Cursor settings like this:
+
+![Successful MCP setup in Cursor](images/cursor_mcp_setup.png "MCP setup as shown in Cursor settings")
+
+## Windows Setup
+
+### Setting up the MCP Command
+
+On Windows, you can create a batch file to easily run the MCP command:
+
+1. Create a file named `run_mcp.bat` with the following content:
+   ```
+   @echo off
+   SET PATH=C:\Users\YourUsername\.local\bin;%PATH%
+   cd C:\path\to\your\microsoft_fabric_mcp\
+   C:\Users\YourUsername\.local\bin\uv.exe run fabric_mcp.py
+   ```
+
+   Example with real paths:
+   ```
+   @echo off
+   SET PATH=C:\Users\YourUsername\.local\bin;%PATH%
+   cd C:\Users\YourUsername\source\repos\microsoft_fabric_mcp\
+   C:\Users\YourUsername\.local\bin\uv.exe run fabric_mcp.py
+   ```
+
+2. You can then run the MCP command by executing:
+   ```
+   cmd /c C:\path\to\your\microsoft_fabric_mcp\run_mcp.bat
+   ```
+
+   Example:
+   ```
+   cmd /c C:\Users\YourUsername\source\repos\microsoft_fabric_mcp\run_mcp.bat
+   ```
+
+### Virtual Environment Permissions
+
+When activating the virtual environment using `.venv\Scripts\activate` on Windows, you might encounter permission issues. To resolve this, run the following command in PowerShell before activation:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+```
+
+This temporarily changes the execution policy for the current PowerShell session only, allowing scripts to run.
+
+## Example Usage
+
+Once you have set up the MCP server, you can start interacting with your Fabric resources through your AI assistant. Here's an example of how to use it:
+
+### Listing Workspaces in Fabric
+
+You can simply ask your AI assistant to list your workspaces in Fabric:
+
+```
+Can you list my workspaces in Fabric?
+```
+
+The LLM will automatically understand which MCP tool to use based on your query. It will invoke the `list_workspaces` tool and display the results:
+
+![Example of listing Fabric workspaces](images/list_workspaces_example.png "Example of listing workspaces in Fabric")
+
+### Permission Handling
+
+By default, the AI assistant will ask for your permission before running MCP tools that interact with your data. This gives you control over what actions are performed.
+
+If you're using Cursor and want to enable faster interactions, you can enable YOLO mode in the settings. With YOLO mode enabled, the AI assistant will execute MCP tools without asking for permission each time.
+
+> **Note**: YOLO mode is convenient but should be used with caution, as it grants the AI assistant more autonomous access to your data sources.
 
 ## Contributing
 
