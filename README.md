@@ -2,16 +2,16 @@
 
 ## Introduction
 
-This MCP server is created to make it easier for data engineers working in Microsoft Fabric to use generative AI tools without requiring access to Microsoft Fabric Copilot (which demands F64-capacity), which can be prohibitively expensive for many organizations.
+This MCP server provides data engineers with direct access to Microsoft Fabric resources through AI assistants like Cursor, Claude, and other MCP-compatible tools.
 
-We have built MCP tools around the endpoints available in the Fabric REST API. Currently, we've focused on providing schema information for tables in lakehouses, but we plan to expand with more tools covering additional Fabric REST API endpoints as listed in the [Microsoft Fabric REST API documentation](https://learn.microsoft.com/en-us/rest/api/fabric/articles/) as well as the [Azure Data Lake Storage Gen2 REST API documentation](https://learn.microsoft.com/en-us/rest/api/storageservices/data-lake-storage-gen2)
+Built around the Fabric REST API, it includes 26 tools that let you query workspace details, examine table schemas, monitor job execution, and analyze data dependencies. 
 
-By leveraging these tools, data engineers can enhance their productivity and gain AI assistance capabilities without the need for premium licensing.
+Instead of switching between the Fabric portal and your IDE, you can now ask your AI assistant questions like "What tables are in my lakehouse?" or "Show me the schema for the sales table" and get immediate, accurate responses.
 
 ## What is Model Context Protocol (MCP)?
 
 The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context to Large Language Models (LLMs). Think of MCP like a standardized connection port for AI applications - it provides a standardized way to connect AI models to different data sources and tools.
-x
+
 ### How MCP Works
 
 MCP follows a client-server architecture:
@@ -28,6 +28,64 @@ This architecture allows LLMs to interact with your data and tools in a standard
 3. Keep your data secure within your infrastructure
 
 For this project, we recommend using Cursor as your IDE for the best experience, though Windsurf and Claude CLI are also compatible options.
+
+## Available MCP Tools
+
+This MCP server provides **26 comprehensive tools** for complete Fabric operational visibility:
+
+### 🏢 Core Fabric Management
+| Tool | Description | Inputs |
+|------|-------------|---------|
+| `list_workspaces` | List all accessible Fabric workspaces | None |
+| `get_workspace` | Get detailed workspace info including workspace identity status | `workspace` (name/ID) |
+| `list_items` | List all items in workspace with optional type filtering | `workspace` (name/ID), `item_type` (optional) |
+| `get_item` | Get detailed properties and metadata for specific item | `workspace` (name/ID), `item_name` (name/ID) |
+| `list_connections` | List all connections user has access to across entire tenant | None |
+| `list_lakehouses` | List all lakehouses in specified workspace | `workspace` (name/ID) |
+| `list_capacities` | List all Fabric capacities user has access to | None |
+| `get_workspace_identity` | Get workspace identity details for a specific workspace | `workspace` (name/ID) |
+| `list_workspaces_with_identity` | List workspaces that have workspace identities configured | None |
+
+### 📊 Data & Schema Management
+| Tool | Description | Inputs |
+|------|-------------|---------|
+| `get_all_schemas` | Get schemas for all Delta tables in lakehouse | `workspace` (name/ID), `lakehouse` (name/ID) |
+| `get_table_schema` | Get detailed schema for specific table | `workspace` (name/ID), `lakehouse` (name/ID), `table_name` |
+| `list_tables` | List all tables in lakehouse with format/type info | `workspace` (name/ID), `lakehouse` (name/ID) |
+| `list_shortcuts` | List OneLake shortcuts for specific item | `workspace` (name/ID), `item_name` (name/ID), `parent_path` (optional) |
+| `get_shortcut` | Get detailed shortcut configuration and target | `workspace` (name/ID), `item_name` (name/ID), `shortcut_name`, `parent_path` (optional) |
+| `list_workspace_shortcuts` | Aggregate all shortcuts across workspace items | `workspace` (name/ID) |
+
+### ⚡ Job Monitoring & Scheduling  
+| Tool | Description | Inputs |
+|------|-------------|---------|
+| `list_job_instances` | List job instances with status/item filtering for monitoring | `workspace` (name/ID), `item_name` (optional), `status` (optional) |
+| `get_job_instance` | Get detailed job info including errors and timing | `workspace` (name/ID), `item_name` (name/ID), `job_instance_id` |
+| `list_item_schedules` | List all schedules for specific item | `workspace` (name/ID), `item_name` (name/ID) |
+| `list_workspace_schedules` | Aggregate all schedules across workspace - complete scheduling overview | `workspace` (name/ID) |
+
+### 🎯 Operational Intelligence
+| Tool | Description | Inputs |
+|------|-------------|---------|
+| `list_compute_usage` | Monitor active jobs and estimate resource consumption | `workspace` (optional), `time_range_hours` (default: 24) |
+| `get_item_lineage` | Analyze data flow dependencies upstream/downstream | `workspace` (name/ID), `item_name` (name/ID) |
+| `list_item_dependencies` | Map all item dependencies in workspace | `workspace` (name/ID), `item_type` (optional) |
+| `get_data_source_usage` | Analyze connection usage patterns across items | `workspace` (optional), `connection_name` (optional) |
+| `list_environments` | List Fabric environments for compute/library management | `workspace` (optional) |
+| `get_environment_details` | Get detailed environment config including Spark settings and libraries | `workspace` (name/ID), `environment_name` (name/ID) |
+
+### 🛠️ Cache Management & Administration
+| Tool | Description | Inputs |
+|------|-------------|---------|
+| `clear_fabric_data_cache` | Clear all data list caches to see newly created resources immediately | `show_stats` (optional, default: true) |
+
+### 🔍 Key Features
+- **99% READ-ONLY**: 25 read-only tools + 1 cache management tool - safe for production use
+- **Comprehensive Coverage**: 26 tools covering all major Fabric operational areas
+- **Smart Filtering**: Most tools support optional filtering for targeted analysis
+- **Operational Intelligence**: Advanced tools for lineage, dependencies, and resource monitoring
+- **High Performance**: TTL caching for fast responses with cache invalidation on demand
+- **Enterprise Ready**: Designed for production Fabric environments and governance
 
 ## Getting Started
 
