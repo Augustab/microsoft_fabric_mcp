@@ -2,36 +2,27 @@
 
 ## Introduction
 
-This MCP server provides data engineers with direct access to Microsoft Fabric resources through AI assistants like Cursor, Claude, and other MCP-compatible tools.
+This MCP server provides data engineers with **safe, read-only access** to Microsoft Fabric resources through AI assistants like Cursor, Claude, and other MCP-compatible tools.
 
-Built around the Fabric REST API, it includes 26 tools that let you query workspace details, examine table schemas, monitor job execution, and analyze data dependencies. 
+Built around the Fabric REST API using **only GET requests**, it includes 27 tools that let you query workspace details, examine table schemas, monitor job execution, and analyze data dependencies - all without any risk of modifying your production data.
 
 Instead of switching between the Fabric portal and your IDE, you can now ask your AI assistant questions like "What tables are in my lakehouse?" or "Show me the schema for the sales table" and get immediate, accurate responses.
 
-## What is Model Context Protocol (MCP)?
+## 🔍 Key Features
 
-The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context to Large Language Models (LLMs). Think of MCP like a standardized connection port for AI applications - it provides a standardized way to connect AI models to different data sources and tools.
-
-### How MCP Works
-
-MCP follows a client-server architecture:
-
-- **MCP Hosts**: Programs like Cursor IDE, Windsurf, Claude CLI, or other AI tools that want to access data through MCP
-- **MCP Clients**: Protocol clients that maintain connections with servers
-- **MCP Servers**: Lightweight programs (like this Microsoft Fabric MCP) that expose specific capabilities through the standardized protocol
-- **Data Sources**: Your Fabric resources, databases, and other services that MCP servers can securely access
-
-This architecture allows LLMs to interact with your data and tools in a standardized way, making it possible to:
-
-1. Connect to pre-built integrations that your LLM can directly use
-2. Maintain flexibility to switch between LLM providers
-3. Keep your data secure within your infrastructure
-
-For this project, we recommend using Cursor as your IDE for the best experience, though Windsurf and Claude CLI are also compatible options.
+- **100% Safe Operations**: Uses only GET requests - no data modification possible
+- **99% READ-ONLY**: 25 read-only tools + 2 cache management tools - safe for production use
+- **Comprehensive Coverage**: 25 tools covering all major Fabric operational areas
+- **Smart Filtering**: Most tools support optional filtering for targeted analysis
+- **Operational Intelligence**: Advanced tools for lineage, dependencies, and resource monitoring
+- **High Performance**: TTL caching for fast responses with cache invalidation on demand
+- **Enterprise Ready**: Designed for production Fabric environments and governance
 
 ## Available MCP Tools
 
-This MCP server provides **26 comprehensive tools** for complete Fabric operational visibility:
+This MCP server provides **27 comprehensive tools** for complete Fabric operational visibility:
+
+> **📝 Parameter Note**: When you see `workspace` as a parameter, it accepts either the **workspace name** (like "DWH-PROD", "Analytics-Dev") or the **workspace ID/GUID**. Workspace names are more user-friendly and recommended for most use cases. The system automatically resolves names to IDs with smart caching for performance.
 
 ### 🏢 Core Fabric Management
 | Tool | Description | Inputs |
@@ -78,14 +69,40 @@ This MCP server provides **26 comprehensive tools** for complete Fabric operatio
 | Tool | Description | Inputs |
 |------|-------------|---------|
 | `clear_fabric_data_cache` | Clear all data list caches to see newly created resources immediately | `show_stats` (optional, default: true) |
+| `clear_name_resolution_cache` | Clear global name→ID resolution caches for workspaces and lakehouses | `show_stats` (optional, default: true) |
 
-### 🔍 Key Features
-- **99% READ-ONLY**: 25 read-only tools + 1 cache management tool - safe for production use
-- **Comprehensive Coverage**: 26 tools covering all major Fabric operational areas
-- **Smart Filtering**: Most tools support optional filtering for targeted analysis
-- **Operational Intelligence**: Advanced tools for lineage, dependencies, and resource monitoring
-- **High Performance**: TTL caching for fast responses with cache invalidation on demand
-- **Enterprise Ready**: Designed for production Fabric environments and governance
+
+## Cache Management System
+
+The MCP server uses a sophisticated two-tier caching system for optimal performance:
+
+### 🔄 Data List Caches (TTL-based)
+These caches store lists of resources (workspaces, items, connections, etc.) and automatically expire after a set time:
+- **Purpose**: Speed up repeated queries for resource lists
+- **Behavior**: Automatically refresh when expired
+- **Use Case**: When you create new resources and want to see them immediately in lists
+
+**Clear with**: `clear_fabric_data_cache`
+
+### 🏷️ Name Resolution Caches (Global, Permanent)
+These caches store name→ID mappings and persist across all requests:
+- **Purpose**: Avoid repeated API calls to resolve workspace/lakehouse names to IDs
+- **Behavior**: Never expire automatically (name→ID mappings are permanent)
+- **Use Case**: When a workspace/lakehouse is renamed or deleted/recreated with the same name
+
+**Clear with**: `clear_name_resolution_cache`
+
+### When to Use Each Cache Tool
+
+| Scenario | Tool to Use | Reason |
+|----------|-------------|---------|
+| Created a new workspace/lakehouse | `clear_fabric_data_cache` | See new resources in lists |
+| Renamed a workspace/lakehouse | `clear_name_resolution_cache` | Update name→ID mappings |
+| Deleted and recreated a resource with same name | `clear_name_resolution_cache` | New resource has different ID |
+| General performance troubleshooting | `clear_fabric_data_cache` | Refresh all data lists |
+| Suspect stale name resolution | `clear_name_resolution_cache` | Force fresh name lookups |
+
+Both tools are safe to use and will show detailed statistics about what was cleared.
 
 ## Getting Started
 
@@ -248,6 +265,16 @@ You can simply ask your AI assistant to list your workspaces in Fabric:
 Can you list my workspaces in Fabric?
 ```
 
+Then use either workspace names or IDs in subsequent commands:
+
+```
+Can you show me all the lakehouses in the "DWH-PROD" workspace?
+Can you get the schema for the "sales" table in the "GK_Bronze" lakehouse in "DWH-PROD"?
+
+# Or using workspace ID if you have it:
+Can you list items in workspace "abc-123-def-456"?
+```
+
 The LLM will automatically understand which MCP tool to use based on your query. It will invoke the `list_workspaces` tool and display the results:
 
 <div align="center">
@@ -277,6 +304,27 @@ By default, the AI assistant will ask for your permission before running MCP too
 If you're using Cursor and want to enable faster interactions, you can enable YOLO mode in the settings. With YOLO mode enabled, the AI assistant will execute MCP tools without asking for permission each time.
 
 > **Note**: YOLO mode is convenient but should be used with caution, as it grants the AI assistant more autonomous access to your data sources.
+
+## What is Model Context Protocol (MCP)?
+
+The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context to Large Language Models (LLMs). Think of MCP like a standardized connection port for AI applications - it provides a standardized way to connect AI models to different data sources and tools.
+
+### How MCP Works
+
+MCP follows a client-server architecture:
+
+- **MCP Hosts**: Programs like Cursor IDE, Windsurf, Claude CLI, or other AI tools that want to access data through MCP
+- **MCP Clients**: Protocol clients that maintain connections with servers
+- **MCP Servers**: Lightweight programs (like this Microsoft Fabric MCP) that expose specific capabilities through the standardized protocol
+- **Data Sources**: Your Fabric resources, databases, and other services that MCP servers can securely access
+
+This architecture allows LLMs to interact with your data and tools in a standardized way, making it possible to:
+
+1. Connect to pre-built integrations that your LLM can directly use
+2. Maintain flexibility to switch between LLM providers
+3. Keep your data secure within your infrastructure
+
+For this project, we recommend using Cursor as your IDE for the best experience, though Windsurf and Claude CLI are also compatible options.
 
 ## Contributing
 
