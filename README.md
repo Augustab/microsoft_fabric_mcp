@@ -74,6 +74,8 @@ This MCP server provides **27 comprehensive tools** for complete Fabric operatio
 
 ## Cache Management System
 
+> **💡 Note for Users**: Cache management is **completely optional**. The MCP works perfectly without any cache intervention. These tools are only provided for advanced users who need to see newly created resources immediately or troubleshoot specific caching scenarios.
+
 The MCP server uses a sophisticated two-tier caching system for optimal performance:
 
 ### 🔄 Data List Caches (TTL-based)
@@ -191,17 +193,34 @@ To use the MCP (Module Context Protocol) with this toolkit, follow these steps:
 
 1. Make sure you have completed the UV setup and Azure CLI authentication steps above.
 
-2. Add an MCP with a suitable name (like "fabric") in the Cursor settings under the MCP section. Use the following command format:
+2. Add an MCP with a suitable name (like "mcp_fabric") in the Cursor settings under the MCP section. You can configure this in two ways:
+
+### Option A: Command Line Format
+Use the following command format:
 ```bash
 uv --directory PATH_TO_YOUR_FOLDER run fabric_mcp.py
 ```
 
 For example:
 ```bash
-uv --directory /Users/augbir/Documents/coding-assistant-tips/coding-assistant-tips/ run fabric_mcp.py
+uv --directory /Users/username/Documents/microsoft_fabric_mcp run fabric_mcp.py
 ```
 
-Replace `PATH_TO_YOUR_FOLDER` with the path to the folder containing this toolkit. This command configures the MCP server with the Fabric-specific tools.
+### Option B: JSON Configuration
+Alternatively, you can add the configuration directly to your Cursor MCP settings JSON:
+```json
+"mcp_fabric": {
+  "command": "uv",
+  "args": [
+    "--directory",
+    "/Users/username/Documents/microsoft_fabric_mcp",
+    "run",
+    "fabric_mcp.py"
+  ]
+}
+```
+
+Replace `PATH_TO_YOUR_FOLDER` or `/Users/username/Documents/microsoft_fabric_mcp` with the actual path to the folder containing this toolkit. This command configures the MCP server with the Fabric-specific tools.
 
 3. Once the MCP is configured, you can interact with Microsoft Fabric resources directly from your tools and applications.
 
@@ -209,7 +228,9 @@ Replace `PATH_TO_YOUR_FOLDER` with the path to the folder containing this toolki
 
 5. When successfully configured, your MCP will appear in Cursor settings like this:
 
-![Successful MCP setup in Cursor](images/cursor_mcp_setup.png "MCP setup as shown in Cursor settings")
+<div align="center">
+  <img src="images/fmcp.png" alt="Successful MCP setup in Cursor" title="MCP setup as shown in Cursor settings" width="50%">
+</div>
 
 ## Windows Setup
 
