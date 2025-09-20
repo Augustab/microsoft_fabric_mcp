@@ -2,32 +2,109 @@
 
 ## Introduction
 
-This MCP server is created to make it easier for data engineers working in Microsoft Fabric to use generative AI tools without requiring access to Microsoft Fabric Copilot (which demands F64-capacity), which can be prohibitively expensive for many organizations.
+This MCP server provides data engineers with **safe, read-only access** to Microsoft Fabric resources through AI assistants like Cursor, Claude, and other MCP-compatible tools.
 
-We have built MCP tools around the endpoints available in the Fabric REST API. Currently, we've focused on providing schema information for tables in lakehouses, but we plan to expand with more tools covering additional Fabric REST API endpoints as listed in the [Microsoft Fabric REST API documentation](https://learn.microsoft.com/en-us/rest/api/fabric/articles/) as well as the [Azure Data Lake Storage Gen2 REST API documentation](https://learn.microsoft.com/en-us/rest/api/storageservices/data-lake-storage-gen2)
+Built around the Fabric REST API using **only GET requests**, it includes 27 tools that let you query workspace details, examine table schemas, monitor job execution, and analyze data dependencies - all without any risk of modifying your production data.
 
-By leveraging these tools, data engineers can enhance their productivity and gain AI assistance capabilities without the need for premium licensing.
+Instead of switching between the Fabric portal and your IDE, you can now ask your AI assistant questions like "What tables are in my lakehouse?" or "Show me the schema for the sales table" and get immediate, accurate responses.
 
-## What is Model Context Protocol (MCP)?
+## 🔍 Key Features
 
-The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context to Large Language Models (LLMs). Think of MCP like a standardized connection port for AI applications - it provides a standardized way to connect AI models to different data sources and tools.
-x
-### How MCP Works
+- **100% Safe Operations**: Uses only GET requests - no data modification possible
+- **99% READ-ONLY**: 25 read-only tools + 2 cache management tools - safe for production use
+- **Comprehensive Coverage**: 25 tools covering all major Fabric operational areas
+- **Smart Filtering**: Most tools support optional filtering for targeted analysis
+- **Operational Intelligence**: Advanced tools for lineage, dependencies, and resource monitoring
+- **High Performance**: TTL caching for fast responses with cache invalidation on demand
+- **Enterprise Ready**: Designed for production Fabric environments and governance
 
-MCP follows a client-server architecture:
+## Available MCP Tools
 
-- **MCP Hosts**: Programs like Cursor IDE, Windsurf, Claude CLI, or other AI tools that want to access data through MCP
-- **MCP Clients**: Protocol clients that maintain connections with servers
-- **MCP Servers**: Lightweight programs (like this Microsoft Fabric MCP) that expose specific capabilities through the standardized protocol
-- **Data Sources**: Your Fabric resources, databases, and other services that MCP servers can securely access
+This MCP server provides **27 comprehensive tools** for complete Fabric operational visibility:
 
-This architecture allows LLMs to interact with your data and tools in a standardized way, making it possible to:
+> **📝 Parameter Note**: When you see `workspace` as a parameter, it accepts either the **workspace name** (like "DWH-PROD", "Analytics-Dev") or the **workspace ID/GUID**. Workspace names are more user-friendly and recommended for most use cases. The system automatically resolves names to IDs with smart caching for performance.
 
-1. Connect to pre-built integrations that your LLM can directly use
-2. Maintain flexibility to switch between LLM providers
-3. Keep your data secure within your infrastructure
+### 🏢 Core Fabric Management
+| Tool | Description | Inputs |
+|------|-------------|---------|
+| `list_workspaces` | List all accessible Fabric workspaces | None |
+| `get_workspace` | Get detailed workspace info including workspace identity status | `workspace` (name/ID) |
+| `list_items` | List all items in workspace with optional type filtering | `workspace` (name/ID), `item_type` (optional) |
+| `get_item` | Get detailed properties and metadata for specific item | `workspace` (name/ID), `item_name` (name/ID) |
+| `list_connections` | List all connections user has access to across entire tenant | None |
+| `list_lakehouses` | List all lakehouses in specified workspace | `workspace` (name/ID) |
+| `list_capacities` | List all Fabric capacities user has access to | None |
+| `get_workspace_identity` | Get workspace identity details for a specific workspace | `workspace` (name/ID) |
+| `list_workspaces_with_identity` | List workspaces that have workspace identities configured | None |
 
-For this project, we recommend using Cursor as your IDE for the best experience, though Windsurf and Claude CLI are also compatible options.
+### 📊 Data & Schema Management
+| Tool | Description | Inputs |
+|------|-------------|---------|
+| `get_all_schemas` | Get schemas for all Delta tables in lakehouse | `workspace` (name/ID), `lakehouse` (name/ID) |
+| `get_table_schema` | Get detailed schema for specific table | `workspace` (name/ID), `lakehouse` (name/ID), `table_name` |
+| `list_tables` | List all tables in lakehouse with format/type info | `workspace` (name/ID), `lakehouse` (name/ID) |
+| `list_shortcuts` | List OneLake shortcuts for specific item | `workspace` (name/ID), `item_name` (name/ID), `parent_path` (optional) |
+| `get_shortcut` | Get detailed shortcut configuration and target | `workspace` (name/ID), `item_name` (name/ID), `shortcut_name`, `parent_path` (optional) |
+| `list_workspace_shortcuts` | Aggregate all shortcuts across workspace items | `workspace` (name/ID) |
+
+### ⚡ Job Monitoring & Scheduling  
+| Tool | Description | Inputs |
+|------|-------------|---------|
+| `list_job_instances` | List job instances with status/item filtering for monitoring | `workspace` (name/ID), `item_name` (optional), `status` (optional) |
+| `get_job_instance` | Get detailed job info including errors and timing | `workspace` (name/ID), `item_name` (name/ID), `job_instance_id` |
+| `list_item_schedules` | List all schedules for specific item | `workspace` (name/ID), `item_name` (name/ID) |
+| `list_workspace_schedules` | Aggregate all schedules across workspace - complete scheduling overview | `workspace` (name/ID) |
+
+### 🎯 Operational Intelligence
+| Tool | Description | Inputs |
+|------|-------------|---------|
+| `list_compute_usage` | Monitor active jobs and estimate resource consumption | `workspace` (optional), `time_range_hours` (default: 24) |
+| `get_item_lineage` | Analyze data flow dependencies upstream/downstream | `workspace` (name/ID), `item_name` (name/ID) |
+| `list_item_dependencies` | Map all item dependencies in workspace | `workspace` (name/ID), `item_type` (optional) |
+| `get_data_source_usage` | Analyze connection usage patterns across items | `workspace` (optional), `connection_name` (optional) |
+| `list_environments` | List Fabric environments for compute/library management | `workspace` (optional) |
+| `get_environment_details` | Get detailed environment config including Spark settings and libraries | `workspace` (name/ID), `environment_name` (name/ID) |
+
+### 🛠️ Cache Management & Administration
+| Tool | Description | Inputs |
+|------|-------------|---------|
+| `clear_fabric_data_cache` | Clear all data list caches to see newly created resources immediately | `show_stats` (optional, default: true) |
+| `clear_name_resolution_cache` | Clear global name→ID resolution caches for workspaces and lakehouses | `show_stats` (optional, default: true) |
+
+
+## Cache Management System
+
+> **💡 Note for Users**: Cache management is **completely optional**. The MCP works perfectly without any cache intervention. These tools are only provided for advanced users who need to see newly created resources immediately or troubleshoot specific caching scenarios.
+
+The MCP server uses a sophisticated two-tier caching system for optimal performance:
+
+### 🔄 Data List Caches (TTL-based)
+These caches store lists of resources (workspaces, items, connections, etc.) and automatically expire after a set time:
+- **Purpose**: Speed up repeated queries for resource lists
+- **Behavior**: Automatically refresh when expired
+- **Use Case**: When you create new resources and want to see them immediately in lists
+
+**Clear with**: `clear_fabric_data_cache`
+
+### 🏷️ Name Resolution Caches (Global, Permanent)
+These caches store name→ID mappings and persist across all requests:
+- **Purpose**: Avoid repeated API calls to resolve workspace/lakehouse names to IDs
+- **Behavior**: Never expire automatically (name→ID mappings are permanent)
+- **Use Case**: When a workspace/lakehouse is renamed or deleted/recreated with the same name
+
+**Clear with**: `clear_name_resolution_cache`
+
+### When to Use Each Cache Tool
+
+| Scenario | Tool to Use | Reason |
+|----------|-------------|---------|
+| Created a new workspace/lakehouse | `clear_fabric_data_cache` | See new resources in lists |
+| Renamed a workspace/lakehouse | `clear_name_resolution_cache` | Update name→ID mappings |
+| Deleted and recreated a resource with same name | `clear_name_resolution_cache` | New resource has different ID |
+| General performance troubleshooting | `clear_fabric_data_cache` | Refresh all data lists |
+| Suspect stale name resolution | `clear_name_resolution_cache` | Force fresh name lookups |
+
+Both tools are safe to use and will show detailed statistics about what was cleared.
 
 ## Getting Started
 
@@ -116,17 +193,34 @@ To use the MCP (Module Context Protocol) with this toolkit, follow these steps:
 
 1. Make sure you have completed the UV setup and Azure CLI authentication steps above.
 
-2. Add an MCP with a suitable name (like "fabric") in the Cursor settings under the MCP section. Use the following command format:
+2. Add an MCP with a suitable name (like "mcp_fabric") in the Cursor settings under the MCP section. You can configure this in two ways:
+
+### Option A: Command Line Format
+Use the following command format:
 ```bash
 uv --directory PATH_TO_YOUR_FOLDER run fabric_mcp.py
 ```
 
 For example:
 ```bash
-uv --directory /Users/augbir/Documents/coding-assistant-tips/coding-assistant-tips/ run fabric_mcp.py
+uv --directory /Users/username/Documents/microsoft_fabric_mcp run fabric_mcp.py
 ```
 
-Replace `PATH_TO_YOUR_FOLDER` with the path to the folder containing this toolkit. This command configures the MCP server with the Fabric-specific tools.
+### Option B: JSON Configuration
+Alternatively, you can add the configuration directly to your Cursor MCP settings JSON:
+```json
+"mcp_fabric": {
+  "command": "uv",
+  "args": [
+    "--directory",
+    "/Users/username/Documents/microsoft_fabric_mcp",
+    "run",
+    "fabric_mcp.py"
+  ]
+}
+```
+
+Replace `PATH_TO_YOUR_FOLDER` or `/Users/username/Documents/microsoft_fabric_mcp` with the actual path to the folder containing this toolkit. This command configures the MCP server with the Fabric-specific tools.
 
 3. Once the MCP is configured, you can interact with Microsoft Fabric resources directly from your tools and applications.
 
@@ -134,7 +228,9 @@ Replace `PATH_TO_YOUR_FOLDER` with the path to the folder containing this toolki
 
 5. When successfully configured, your MCP will appear in Cursor settings like this:
 
-![Successful MCP setup in Cursor](images/cursor_mcp_setup.png "MCP setup as shown in Cursor settings")
+<div align="center">
+  <img src="images/fmcp.png" alt="Successful MCP setup in Cursor" title="MCP setup as shown in Cursor settings" width="50%">
+</div>
 
 ## Windows Setup
 
@@ -190,6 +286,16 @@ You can simply ask your AI assistant to list your workspaces in Fabric:
 Can you list my workspaces in Fabric?
 ```
 
+Then use either workspace names or IDs in subsequent commands:
+
+```
+Can you show me all the lakehouses in the "DWH-PROD" workspace?
+Can you get the schema for the "sales" table in the "GK_Bronze" lakehouse in "DWH-PROD"?
+
+# Or using workspace ID if you have it:
+Can you list items in workspace "abc-123-def-456"?
+```
+
 The LLM will automatically understand which MCP tool to use based on your query. It will invoke the `list_workspaces` tool and display the results:
 
 <div align="center">
@@ -219,6 +325,27 @@ By default, the AI assistant will ask for your permission before running MCP too
 If you're using Cursor and want to enable faster interactions, you can enable YOLO mode in the settings. With YOLO mode enabled, the AI assistant will execute MCP tools without asking for permission each time.
 
 > **Note**: YOLO mode is convenient but should be used with caution, as it grants the AI assistant more autonomous access to your data sources.
+
+## What is Model Context Protocol (MCP)?
+
+The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context to Large Language Models (LLMs). Think of MCP like a standardized connection port for AI applications - it provides a standardized way to connect AI models to different data sources and tools.
+
+### How MCP Works
+
+MCP follows a client-server architecture:
+
+- **MCP Hosts**: Programs like Cursor IDE, Windsurf, Claude CLI, or other AI tools that want to access data through MCP
+- **MCP Clients**: Protocol clients that maintain connections with servers
+- **MCP Servers**: Lightweight programs (like this Microsoft Fabric MCP) that expose specific capabilities through the standardized protocol
+- **Data Sources**: Your Fabric resources, databases, and other services that MCP servers can securely access
+
+This architecture allows LLMs to interact with your data and tools in a standardized way, making it possible to:
+
+1. Connect to pre-built integrations that your LLM can directly use
+2. Maintain flexibility to switch between LLM providers
+3. Keep your data secure within your infrastructure
+
+For this project, we recommend using Cursor as your IDE for the best experience, though Windsurf and Claude CLI are also compatible options.
 
 ## Contributing
 
