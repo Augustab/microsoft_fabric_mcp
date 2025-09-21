@@ -1,5 +1,7 @@
 # Microsoft Fabric MCP
 
+[![PyPI version](https://badge.fury.io/py/microsoft-fabric-mcp.svg)](https://badge.fury.io/py/microsoft-fabric-mcp)
+
 A Model Context Protocol server that provides read-only access to Microsoft Fabric resources. Query workspaces, examine table schemas, monitor jobs, and analyze dependencies using natural language.
 
 ## Features
