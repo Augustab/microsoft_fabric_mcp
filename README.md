@@ -1,28 +1,17 @@
 # Microsoft Fabric MCP
 
-## Introduction
+A Model Context Protocol server that provides read-only access to Microsoft Fabric resources. Query workspaces, examine table schemas, monitor jobs, and analyze dependencies using natural language.
 
-This MCP server provides data engineers with **safe, read-only access** to Microsoft Fabric resources through AI assistants like Cursor, Claude, and other MCP-compatible tools.
+## Features
 
-Built around the Fabric REST API using **only GET requests**, it includes 27 tools that let you query workspace details, examine table schemas, monitor job execution, and analyze data dependencies - all without any risk of modifying your production data.
-
-Instead of switching between the Fabric portal and your IDE, you can now ask your AI assistant questions like "What tables are in my lakehouse?" or "Show me the schema for the sales table" and get immediate, accurate responses.
-
-## 🔍 Key Features
-
-- **100% Safe Operations**: Uses only GET requests - no data modification possible
-- **99% READ-ONLY**: 25 read-only tools + 2 cache management tools - safe for production use
-- **Comprehensive Coverage**: 25 tools covering all major Fabric operational areas
-- **Smart Filtering**: Most tools support optional filtering for targeted analysis
-- **Operational Intelligence**: Advanced tools for lineage, dependencies, and resource monitoring
-- **High Performance**: TTL caching for fast responses with cache invalidation on demand
-- **Enterprise Ready**: Designed for production Fabric environments and governance
+- **25 tools** covering workspaces, lakehouses, tables, jobs, and dependencies
+- **Read-only operations** - uses only GET requests, no risk of data modification
+- **Smart caching** for fast responses
+- **Works with** Cursor, Claude, and other MCP-compatible AI tools
 
 ## Available MCP Tools
 
-This MCP server provides **27 comprehensive tools** for complete Fabric operational visibility:
-
-> **📝 Parameter Note**: When you see `workspace` as a parameter, it accepts either the **workspace name** (like "DWH-PROD", "Analytics-Dev") or the **workspace ID/GUID**. Workspace names are more user-friendly and recommended for most use cases. The system automatically resolves names to IDs with smart caching for performance.
+> **Parameter Note**: `workspace` parameters accept either workspace names (e.g., "DWH-PROD") or workspace IDs. Names are recommended for ease of use.
 
 ### 🏢 Core Fabric Management
 | Tool | Description | Inputs |
@@ -65,91 +54,26 @@ This MCP server provides **27 comprehensive tools** for complete Fabric operatio
 | `list_environments` | List Fabric environments for compute/library management | `workspace` (optional) |
 | `get_environment_details` | Get detailed environment config including Spark settings and libraries | `workspace` (name/ID), `environment_name` (name/ID) |
 
-### 🛠️ Cache Management & Administration
-| Tool | Description | Inputs |
-|------|-------------|---------|
-| `clear_fabric_data_cache` | Clear all data list caches to see newly created resources immediately | `show_stats` (optional, default: true) |
-| `clear_name_resolution_cache` | Clear global name→ID resolution caches for workspaces and lakehouses | `show_stats` (optional, default: true) |
+## Caching
 
-
-## Cache Management System
-
-> **💡 Note for Users**: Cache management is **completely optional**. The MCP works perfectly without any cache intervention. These tools are only provided for advanced users who need to see newly created resources immediately or troubleshoot specific caching scenarios.
-
-The MCP server uses a sophisticated two-tier caching system for optimal performance:
-
-### 🔄 Data List Caches (TTL-based)
-These caches store lists of resources (workspaces, items, connections, etc.) and automatically expire after a set time:
-- **Purpose**: Speed up repeated queries for resource lists
-- **Behavior**: Automatically refresh when expired
-- **Use Case**: When you create new resources and want to see them immediately in lists
-
-**Clear with**: `clear_fabric_data_cache`
-
-### 🏷️ Name Resolution Caches (Global, Permanent)
-These caches store name→ID mappings and persist across all requests:
-- **Purpose**: Avoid repeated API calls to resolve workspace/lakehouse names to IDs
-- **Behavior**: Never expire automatically (name→ID mappings are permanent)
-- **Use Case**: When a workspace/lakehouse is renamed or deleted/recreated with the same name
-
-**Clear with**: `clear_name_resolution_cache`
-
-### When to Use Each Cache Tool
-
-| Scenario | Tool to Use | Reason |
-|----------|-------------|---------|
-| Created a new workspace/lakehouse | `clear_fabric_data_cache` | See new resources in lists |
-| Renamed a workspace/lakehouse | `clear_name_resolution_cache` | Update name→ID mappings |
-| Deleted and recreated a resource with same name | `clear_name_resolution_cache` | New resource has different ID |
-| General performance troubleshooting | `clear_fabric_data_cache` | Refresh all data lists |
-| Suspect stale name resolution | `clear_name_resolution_cache` | Force fresh name lookups |
-
-Both tools are safe to use and will show detailed statistics about what was cleared.
+The server caches responses for performance. Use `clear_fabric_data_cache` to refresh resource lists or `clear_name_resolution_cache` after renaming workspaces/lakehouses.
 
 ## Getting Started
 
-1. Clone this repository
-2. Install required dependencies using UV (see "Setting Up UV Project" section below)
-3. Set up Azure CLI authentication (see "Azure CLI Authentication" section below)
-4. Use the tools as needed for your data engineering tasks
+1. Install UV and Azure CLI (see sections below)
+2. Set up Azure CLI authentication: `az login`
+3. Configure MCP in Cursor (see "Setting up MCP" section below)
 
-## Setting Up UV Project
+## Installation
 
-After cloning this repository, follow these steps to set up the UV project:
-
-1. Install UV (if not already installed):
+### UV
 ```bash
-# On macOS/Linux
+# macOS/Linux
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# On Windows (using PowerShell)
+# Windows
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
-
-2. Create a virtual environment:
-```bash
-uv venv
-```
-
-3. Activate the virtual environment:
-```bash
-# On macOS/Linux
-source .venv/bin/activate
-
-# On Windows
-.venv\Scripts\activate
-```
-
-4. Install dependencies:
-```bash
-uv pip install -e .
-```
-
-5. Verify installation:
-```bash
-uv run fabric_mcp.py
-```
-This confirms that everything is working correctly.
 
 ## Azure CLI Authentication
 
@@ -191,23 +115,30 @@ When this is done, the `DefaultAzureCredential` in our code will automatically f
 
 To use the MCP (Module Context Protocol) with this toolkit, follow these steps:
 
-1. Make sure you have completed the UV setup and Azure CLI authentication steps above.
+1. Make sure you have completed the Azure CLI authentication steps above.
 
-2. Add an MCP with a suitable name (like "mcp_fabric") in the Cursor settings under the MCP section. You can configure this in two ways:
+2. **Choose your installation method:**
 
-### Option A: Command Line Format
-Use the following command format:
-```bash
-uv --directory PATH_TO_YOUR_FOLDER run fabric_mcp.py
+### Option A: UVX Installation (Recommended)
+
+Add to Cursor MCP settings:
+```json
+"mcp_fabric": {
+  "command": "uvx",
+  "args": ["microsoft-fabric-mcp"]
+}
 ```
 
-For example:
+### Option B: Local Development
+
+**Clone and install:**
 ```bash
-uv --directory /Users/username/Documents/microsoft_fabric_mcp run fabric_mcp.py
+git clone https://github.com/Augustab/microsoft_fabric_mcp
+cd microsoft_fabric_mcp
+uv pip install -e .
 ```
 
-### Option B: JSON Configuration
-Alternatively, you can add the configuration directly to your Cursor MCP settings JSON:
+**Add to Cursor MCP settings:**
 ```json
 "mcp_fabric": {
   "command": "uv",
@@ -220,7 +151,9 @@ Alternatively, you can add the configuration directly to your Cursor MCP setting
 }
 ```
 
-Replace `PATH_TO_YOUR_FOLDER` or `/Users/username/Documents/microsoft_fabric_mcp` with the actual path to the folder containing this toolkit. This command configures the MCP server with the Fabric-specific tools.
+Replace `/Users/username/Documents/microsoft_fabric_mcp` with your actual path.
+
+> **💡 Note**: Both methods run the MCP server locally on your machine. The UVX method just makes installation much easier!
 
 3. Once the MCP is configured, you can interact with Microsoft Fabric resources directly from your tools and applications.
 
@@ -276,27 +209,19 @@ This temporarily changes the execution policy for the current PowerShell session
 
 ## Example Usage
 
-Once you have set up the MCP server, you can start interacting with your Fabric resources through your AI assistant. Here's an example of how to use it:
+After setup, you can query your Fabric resources through your AI assistant:
 
 ### Listing Workspaces in Fabric
 
-You can simply ask your AI assistant to list your workspaces in Fabric:
+Ask your AI assistant natural language questions:
 
 ```
 Can you list my workspaces in Fabric?
-```
-
-Then use either workspace names or IDs in subsequent commands:
-
-```
 Can you show me all the lakehouses in the "DWH-PROD" workspace?
-Can you get the schema for the "sales" table in the "GK_Bronze" lakehouse in "DWH-PROD"?
-
-# Or using workspace ID if you have it:
-Can you list items in workspace "abc-123-def-456"?
+Can you get the schema for the "sales" table in the "GK_Bronze" lakehouse?
 ```
 
-The LLM will automatically understand which MCP tool to use based on your query. It will invoke the `list_workspaces` tool and display the results:
+The AI will automatically select the appropriate MCP tool and display results:
 
 <div align="center">
   <img src="images/list_workspaces_example.png" alt="Example of listing Fabric workspaces" title="Example of listing workspaces in Fabric" width="450" />
@@ -304,48 +229,26 @@ The LLM will automatically understand which MCP tool to use based on your query.
 
 ### Advanced Use Cases
 
-The main advantage of this MCP integration becomes clear when working with more complex tasks. For example, you can ask Claude to create a notebook that reads data from a specific table in one lakehouse and upserts it into another table in a silver lakehouse:
+For complex tasks, the AI can access multiple resources to generate accurate code:
 
 ```
-Can you create a notebook that reads data from the 'sales' table in the Bronze lakehouse and upserts it into the 'sales_processed' table in the Silver lakehouse? The notebook should take into consideration the schema of both tables.
+Create a notebook that reads from the 'sales' table in Bronze lakehouse and upserts to 'sales_processed' in Silver lakehouse, considering both schemas.
 ```
 
-In this scenario, Claude can use the MCP tools to:
-1. Get the schema information for both tables
-2. Understand the data structure and relationships
-3. Generate appropriate code that handles data types correctly
-4. Create an efficient upsert operation based on the actual table schemas
-
-This level of context-aware assistance would be impossible without the MCP integration giving Claude access to your actual Fabric resources and schemas.
+The AI will:
+1. Get schemas for both tables
+2. Generate code with correct data types
+3. Create an efficient upsert operation
 
 ### Permission Handling
 
-By default, the AI assistant will ask for your permission before running MCP tools that interact with your data. This gives you control over what actions are performed.
+The AI will ask permission before running MCP tools. In Cursor, you can enable YOLO mode for automatic execution without prompts.
 
-If you're using Cursor and want to enable faster interactions, you can enable YOLO mode in the settings. With YOLO mode enabled, the AI assistant will execute MCP tools without asking for permission each time.
+## About Model Context Protocol
 
-> **Note**: YOLO mode is convenient but should be used with caution, as it grants the AI assistant more autonomous access to your data sources.
+Model Context Protocol (MCP) is an open standard that enables AI assistants to securely connect to external data sources and tools. This server implements MCP to provide AI assistants with direct access to your Microsoft Fabric resources.
 
-## What is Model Context Protocol (MCP)?
-
-The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context to Large Language Models (LLMs). Think of MCP like a standardized connection port for AI applications - it provides a standardized way to connect AI models to different data sources and tools.
-
-### How MCP Works
-
-MCP follows a client-server architecture:
-
-- **MCP Hosts**: Programs like Cursor IDE, Windsurf, Claude CLI, or other AI tools that want to access data through MCP
-- **MCP Clients**: Protocol clients that maintain connections with servers
-- **MCP Servers**: Lightweight programs (like this Microsoft Fabric MCP) that expose specific capabilities through the standardized protocol
-- **Data Sources**: Your Fabric resources, databases, and other services that MCP servers can securely access
-
-This architecture allows LLMs to interact with your data and tools in a standardized way, making it possible to:
-
-1. Connect to pre-built integrations that your LLM can directly use
-2. Maintain flexibility to switch between LLM providers
-3. Keep your data secure within your infrastructure
-
-For this project, we recommend using Cursor as your IDE for the best experience, though Windsurf and Claude CLI are also compatible options.
+Learn more: [Model Context Protocol Documentation](https://www.anthropic.com/news/model-context-protocol)
 
 ## Contributing
 
