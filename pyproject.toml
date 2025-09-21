@@ -1,8 +1,23 @@
 [project]
-name = "fabric_mcp"
-version = "0.1.0"
-description = "Evidis first Fabric MCP - Created by August Asheim Birkeland and Erlend Øien"
+name = "microsoft-fabric-mcp"
+version = "0.1.3"
+description = "Safe, read-only MCP server for Microsoft Fabric - 25 tools for data engineers"
 readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "August Asheim Birkeland", email = "augbir@gmail.com"}
+]
+keywords = ["microsoft-fabric", "mcp", "model-context-protocol", "data-engineering", "fabric-api"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering"
+]
 requires-python = ">=3.12"
 dependencies = [
     "azure-identity>=1.20.0",
@@ -12,5 +27,23 @@ dependencies = [
     "requests>=2.32.3",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Augustab/microsoft_fabric_mcp"
+Repository = "https://github.com/Augustab/microsoft_fabric_mcp"
+Issues = "https://github.com/Augustab/microsoft_fabric_mcp/issues"
+
+[project.scripts]
+microsoft-fabric-mcp = "fabric_mcp:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [tool.setuptools]
 py-modules = ["fabric_mcp"]
+
+[dependency-groups]
+dev = [
+    "build>=1.3.0",
+    "twine>=6.2.0",
+]

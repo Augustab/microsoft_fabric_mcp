@@ -2745,6 +2745,11 @@ async def clear_name_resolution_cache(show_stats: bool = True) -> str:
         return f"Error clearing name resolution cache: {str(e)}"
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the MCP server."""
     # Initialize and run the server
     mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()
