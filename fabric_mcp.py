@@ -19,33 +19,18 @@ _global_lakehouse_cache = {}
 # Create MCP instance
 mcp = FastMCP("fabric_schemas")
 
-# Set up logging with more robust duplicate prevention
+# Set up logging
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# Clear any existing handlers first
-logger.handlers.clear()
-
-# Add single handler
-handler = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-
-# Prevent propagation to parent loggers to avoid duplicates
-logger.propagate = False
 
 # Global shared caches for all FabricApiClient instances
-_WORKSPACE_CACHE = TTLCache(maxsize=1, ttl=120)  # 2 min - single workspace list
-_CONNECTIONS_CACHE = TTLCache(maxsize=1, ttl=600)  # 10 min - single connections list
-_CAPACITIES_CACHE = TTLCache(maxsize=1, ttl=900)  # 15 min - single capacities list
-_ITEMS_CACHE = TTLCache(maxsize=50, ttl=300)  # 5 min - items per workspace
-_SHORTCUTS_CACHE = TTLCache(maxsize=100, ttl=300)  # 5 min - shortcuts per item
-_JOB_INSTANCES_CACHE = TTLCache(maxsize=30, ttl=600)  # 10 min - jobs per workspace/item
-_SCHEDULES_CACHE = TTLCache(maxsize=30, ttl=300)  # 5 min - schedules per item/workspace
-_ENVIRONMENTS_CACHE = TTLCache(
-    maxsize=20, ttl=600
-)  # 10 min - environments per workspace
+_WORKSPACE_CACHE = TTLCache(maxsize=1, ttl=120)
+_CONNECTIONS_CACHE = TTLCache(maxsize=1, ttl=600)
+_CAPACITIES_CACHE = TTLCache(maxsize=1, ttl=900)
+_ITEMS_CACHE = TTLCache(maxsize=50, ttl=300)
+_SHORTCUTS_CACHE = TTLCache(maxsize=100, ttl=300)
+_JOB_INSTANCES_CACHE = TTLCache(maxsize=30, ttl=600)
+_SCHEDULES_CACHE = TTLCache(maxsize=30, ttl=300)
+_ENVIRONMENTS_CACHE = TTLCache(maxsize=20, ttl=600)
 
 
 @dataclass
@@ -133,14 +118,12 @@ class FabricApiClient:
         cache_key = "workspaces"
         if cache_key in _WORKSPACE_CACHE:
             logger.info(
-                f"🎯 CACHE HIT: Returning {len(_WORKSPACE_CACHE[cache_key])} workspaces from cache"
+                f"Cache hit: workspaces ({len(_WORKSPACE_CACHE[cache_key])} items)"
             )
             return _WORKSPACE_CACHE[cache_key]
 
-        logger.info("🔄 CACHE MISS: Fetching workspaces from Fabric API")
         workspaces = await self.paginated_request("workspaces")
         _WORKSPACE_CACHE[cache_key] = workspaces
-        logger.info(f"💾 CACHE STORE: Cached {len(workspaces)} workspaces")
         return workspaces
 
     async def get_lakehouses(self, workspace_id: str) -> List[Dict]:
@@ -225,32 +208,26 @@ class FabricApiClient:
         cache_key = "connections"
         if cache_key in _CONNECTIONS_CACHE:
             logger.info(
-                f"🎯 CACHE HIT: Returning {len(_CONNECTIONS_CACHE[cache_key])} connections from cache"
+                f"Cache hit: connections ({len(_CONNECTIONS_CACHE[cache_key])} items)"
             )
             return _CONNECTIONS_CACHE[cache_key]
 
-        logger.info("🔄 CACHE MISS: Fetching connections from Fabric API")
         connections = await self.paginated_request("connections")
         _CONNECTIONS_CACHE[cache_key] = connections
-        logger.info(f"💾 CACHE STORE: Cached {len(connections)} connections")
         return connections
 
     async def get_items(self, workspace_id: str, item_type: str = None) -> List[Dict]:
         """Get all items in workspace, optionally filtered by type with caching"""
         cache_key = f"{workspace_id}:{item_type or 'all'}"
         if cache_key in _ITEMS_CACHE:
-            logger.info(
-                f"🎯 CACHE HIT: Returning {len(_ITEMS_CACHE[cache_key])} items from cache (key: {cache_key})"
-            )
+            logger.info(f"Cache hit: items ({len(_ITEMS_CACHE[cache_key])} items)")
             return _ITEMS_CACHE[cache_key]
 
-        logger.info(f"🔄 CACHE MISS: Fetching items from Fabric API (key: {cache_key})")
         params = {"type": item_type} if item_type else {}
         items = await self.paginated_request(
             f"workspaces/{workspace_id}/items", params=params
         )
         _ITEMS_CACHE[cache_key] = items
-        logger.info(f"💾 CACHE STORE: Cached {len(items)} items (key: {cache_key})")
         return items
 
     async def get_item(self, workspace_id: str, item_id: str) -> Dict:
@@ -300,7 +277,6 @@ class FabricApiClient:
                 except Exception:
                     continue
 
-            # Cache the results
             _JOB_INSTANCES_CACHE[cache_key] = all_jobs
             return all_jobs
         else:
@@ -314,7 +290,6 @@ class FabricApiClient:
                     if job.get("status", "").lower() == status.lower()
                 ]
 
-            # Cache the results
             _JOB_INSTANCES_CACHE[cache_key] = jobs
             return jobs
 
@@ -337,7 +312,6 @@ class FabricApiClient:
             f"workspaces/{workspace_id}/items/{item_id}/schedules"
         )
 
-        # Cache the results
         _SCHEDULES_CACHE[cache_key] = schedules
         return schedules
 
@@ -364,7 +338,6 @@ class FabricApiClient:
             except Exception:
                 continue
 
-        # Cache the results
         _SCHEDULES_CACHE[cache_key] = all_schedules
         return all_schedules
 
@@ -395,7 +368,6 @@ class FabricApiClient:
                 except Exception:
                     continue
 
-        # Cache the results
         _ENVIRONMENTS_CACHE[cache_key] = environments
         return environments
 
@@ -441,7 +413,6 @@ class FabricApiClient:
             shortcuts_response.get("shortcuts", []) if shortcuts_response else []
         )
 
-        # Cache the results
         _SHORTCUTS_CACHE[cache_key] = shortcuts
         return shortcuts
 
@@ -463,13 +434,10 @@ class FabricApiClient:
         cache_key = f"workspace:{workspace_id}"
         if cache_key in _SHORTCUTS_CACHE:
             logger.info(
-                f"🎯 CACHE HIT: Returning {len(_SHORTCUTS_CACHE[cache_key])} workspace shortcuts from cache (key: {cache_key})"
+                f"Cache hit: workspace shortcuts ({len(_SHORTCUTS_CACHE[cache_key])} items)"
             )
             return _SHORTCUTS_CACHE[cache_key]
 
-        logger.info(
-            f"🔄 CACHE MISS: Fetching workspace shortcuts from Fabric API (key: {cache_key})"
-        )
         items = await self.get_items(workspace_id)
         all_shortcuts = []
 
@@ -491,11 +459,7 @@ class FabricApiClient:
                 except Exception:
                     continue
 
-        # Cache the results
         _SHORTCUTS_CACHE[cache_key] = all_shortcuts
-        logger.info(
-            f"💾 CACHE STORE: Cached {len(all_shortcuts)} workspace shortcuts (key: {cache_key})"
-        )
         return all_shortcuts
 
 
@@ -513,7 +477,6 @@ async def get_delta_schemas(
 ) -> List[Tuple[Dict, object, object]]:
     """Get schema and metadata for each Delta table"""
     delta_tables = []
-    logger.info(f"Starting schema extraction for {len(tables)} tables")
 
     # Get token for Azure Storage (not Fabric API)
     token = credential.get_token("https://storage.azure.com/.default").token
@@ -523,7 +486,6 @@ async def get_delta_schemas(
         if table["format"].lower() == "delta":
             try:
                 table_path = table["location"]
-                logger.debug(f"Processing Delta table: {table['name']} at {table_path}")
 
                 # Create DeltaTable instance with storage options
                 delta_table = DeltaTable(table_path, storage_options=storage_options)
@@ -532,7 +494,6 @@ async def get_delta_schemas(
                 delta_tables.append(
                     (table, delta_table.schema(), delta_table.metadata())
                 )
-                logger.info(f"Processed table: {table['name']}")
 
             except Exception as e:
                 logger.error(f"Could not process table {table['name']}: {str(e)}")
@@ -610,7 +571,6 @@ async def get_table_schema(workspace: str, lakehouse: str, table_name: str) -> s
         workspace_id = await client.resolve_workspace(workspace)
         lakehouse_id = await client.resolve_lakehouse(workspace_id, lakehouse)
 
-        # Get all tables
         tables = await client.get_tables(workspace_id, lakehouse_id)
 
         # Find the specific table
@@ -627,7 +587,6 @@ async def get_table_schema(workspace: str, lakehouse: str, table_name: str) -> s
         if table["format"].lower() != "delta":
             return f"The table '{table_name}' is not a Delta table (format: {table['format']})."
 
-        # Get schema
         delta_tables = await get_delta_schemas([table], credential)
 
         if not delta_tables:
@@ -659,7 +618,6 @@ async def get_all_schemas(workspace: str, lakehouse: str) -> str:
         workspace_id = await client.resolve_workspace(workspace)
         lakehouse_id = await client.resolve_lakehouse(workspace_id, lakehouse)
 
-        # Get all tables
         tables = await client.get_tables(workspace_id, lakehouse_id)
 
         if not tables:
@@ -886,7 +844,6 @@ async def get_item(workspace: str, item_id: str) -> str:
         # Convert name to ID
         workspace_id = await client.resolve_workspace(workspace)
 
-        # Get item details
         item = await client.get_item(workspace_id, item_id)
 
         if not item:
@@ -921,7 +878,6 @@ async def get_workspace(workspace: str) -> str:
         # Convert name to ID
         workspace_id = await client.resolve_workspace(workspace)
 
-        # Get workspace details
         workspace_details = await client._make_request(f"workspaces/{workspace_id}")
 
         if not workspace_details:
@@ -951,7 +907,6 @@ async def list_capacities() -> str:
         credential = DefaultAzureCredential()
         client = FabricApiClient(credential)
 
-        # Get capacities
         capacities = await client.get_capacities()
 
         if not capacities:
@@ -983,7 +938,6 @@ async def list_workspaces_with_identity() -> str:
         credential = DefaultAzureCredential()
         client = FabricApiClient(credential)
 
-        # Get all workspaces
         workspaces = await client.get_workspaces()
 
         if not workspaces:
@@ -1075,7 +1029,6 @@ async def get_workspace_identity(workspace: str) -> str:
         # Convert name to ID
         workspace_id = await client.resolve_workspace(workspace)
 
-        # Get workspace details
         workspace_details = await client._make_request(f"workspaces/{workspace_id}")
 
         if not workspace_details:
@@ -2747,7 +2700,7 @@ async def clear_name_resolution_cache(show_stats: bool = True) -> str:
 
 def main():
     """Main entry point for the MCP server."""
-    # Initialize and run the server
+
     mcp.run(transport="stdio")
 
 
