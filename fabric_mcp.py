@@ -12,20 +12,16 @@ from cachetools import TTLCache
 from deltalake import DeltaTable
 from mcp.server.fastmcp import FastMCP
 
-# Global caches for name resolution (these never need clearing as name->ID mappings are permanent)
-_global_workspace_cache = {}
-_global_lakehouse_cache = {}
 
-# Create MCP instance
-mcp = FastMCP("fabric_schemas")
+mcp = FastMCP("microsoft_fabric_mcp")
 
-# Set up logging
 logger = logging.getLogger(__name__)
 
-# Global shared caches for all FabricApiClient instances
-_WORKSPACE_CACHE = TTLCache(maxsize=1, ttl=120)
-_CONNECTIONS_CACHE = TTLCache(maxsize=1, ttl=600)
-_CAPACITIES_CACHE = TTLCache(maxsize=1, ttl=900)
+_WORKSPACE_NAME_TO_ID_CACHE = {}
+_LAKEHOUSE_NAME_TO_ID_CACHE = {}
+_WORKSPACE_CACHE: Optional[List[Dict]] = None  # Simple list cache
+_CONNECTIONS_CACHE: Optional[List[Dict]] = None  # Simple list cache
+_CAPACITIES_CACHE: Optional[List[Dict]] = None  # Simple list cache
 _ITEMS_CACHE = TTLCache(maxsize=50, ttl=300)
 _SHORTCUTS_CACHE = TTLCache(maxsize=100, ttl=300)
 _JOB_INSTANCES_CACHE = TTLCache(maxsize=30, ttl=600)
@@ -115,15 +111,13 @@ class FabricApiClient:
 
     async def get_workspaces(self) -> List[Dict]:
         """Get all available workspaces with caching"""
-        cache_key = "workspaces"
-        if cache_key in _WORKSPACE_CACHE:
-            logger.info(
-                f"Cache hit: workspaces ({len(_WORKSPACE_CACHE[cache_key])} items)"
-            )
-            return _WORKSPACE_CACHE[cache_key]
+        global _WORKSPACE_CACHE
+        if _WORKSPACE_CACHE is not None:
+            logger.info(f"Cache hit: workspaces ({len(_WORKSPACE_CACHE)} items)")
+            return _WORKSPACE_CACHE
 
         workspaces = await self.paginated_request("workspaces")
-        _WORKSPACE_CACHE[cache_key] = workspaces
+        _WORKSPACE_CACHE = workspaces
         return workspaces
 
     async def get_lakehouses(self, workspace_id: str) -> List[Dict]:
@@ -141,22 +135,18 @@ class FabricApiClient:
 
     async def resolve_workspace(self, workspace: str) -> str:
         """Convert workspace name or ID to workspace ID with caching"""
-        # Check global cache first
-        if workspace in _global_workspace_cache:
-            return _global_workspace_cache[workspace]
+        if workspace in _WORKSPACE_NAME_TO_ID_CACHE:
+            return _WORKSPACE_NAME_TO_ID_CACHE[workspace]
 
-        # Resolve and cache the result
         result = await self._resolve_workspace(workspace)
-        _global_workspace_cache[workspace] = result
+        _WORKSPACE_NAME_TO_ID_CACHE[workspace] = result
         return result
 
     async def _resolve_workspace(self, workspace: str) -> str:
         """Internal method to convert workspace name or ID to workspace ID"""
-        # If it's already a valid UUID, return it directly
         if is_valid_uuid(workspace):
             return workspace
 
-        # Otherwise, look up by name
         workspaces = await self.get_workspaces()
         matching_workspaces = [
             w for w in workspaces if w["displayName"].lower() == workspace.lower()
@@ -171,24 +161,20 @@ class FabricApiClient:
 
     async def resolve_lakehouse(self, workspace_id: str, lakehouse: str) -> str:
         """Convert lakehouse name or ID to lakehouse ID with caching"""
-        # Create cache key combining workspace_id and lakehouse name
         cache_key = f"{workspace_id}:{lakehouse}"
 
-        # Check global cache first
-        if cache_key in _global_lakehouse_cache:
-            return _global_lakehouse_cache[cache_key]
+        if cache_key in _LAKEHOUSE_NAME_TO_ID_CACHE:
+            return _LAKEHOUSE_NAME_TO_ID_CACHE[cache_key]
 
-        # Resolve and cache the result
         result = await self._resolve_lakehouse(workspace_id, lakehouse)
-        _global_lakehouse_cache[cache_key] = result
+        _LAKEHOUSE_NAME_TO_ID_CACHE[cache_key] = result
         return result
 
     async def _resolve_lakehouse(self, workspace_id: str, lakehouse: str) -> str:
         """Internal method to convert lakehouse name or ID to lakehouse ID"""
         if is_valid_uuid(lakehouse):
-            # Cache UUID mappings too (workspace_id:UUID -> UUID)
             cache_key = f"{workspace_id}:{lakehouse}"
-            _global_lakehouse_cache[cache_key] = lakehouse
+            _LAKEHOUSE_NAME_TO_ID_CACHE[cache_key] = lakehouse
             return lakehouse
 
         lakehouses = await self.get_lakehouses(workspace_id)
@@ -205,15 +191,13 @@ class FabricApiClient:
 
     async def get_connections(self) -> List[Dict]:
         """Get all connections user has access to with caching"""
-        cache_key = "connections"
-        if cache_key in _CONNECTIONS_CACHE:
-            logger.info(
-                f"Cache hit: connections ({len(_CONNECTIONS_CACHE[cache_key])} items)"
-            )
-            return _CONNECTIONS_CACHE[cache_key]
+        global _CONNECTIONS_CACHE
+        if _CONNECTIONS_CACHE is not None:
+            logger.info(f"Cache hit: connections ({len(_CONNECTIONS_CACHE)} items)")
+            return _CONNECTIONS_CACHE
 
         connections = await self.paginated_request("connections")
-        _CONNECTIONS_CACHE[cache_key] = connections
+        _CONNECTIONS_CACHE = connections
         return connections
 
     async def get_items(self, workspace_id: str, item_type: str = None) -> List[Dict]:
@@ -240,12 +224,13 @@ class FabricApiClient:
 
     async def get_capacities(self) -> List[Dict]:
         """Get all capacities user has access to with caching"""
-        cache_key = "capacities"
-        if cache_key in _CAPACITIES_CACHE:
-            return _CAPACITIES_CACHE[cache_key]
+        global _CAPACITIES_CACHE
+        if _CAPACITIES_CACHE is not None:
+            logger.info(f"Cache hit: capacities ({len(_CAPACITIES_CACHE)} items)")
+            return _CAPACITIES_CACHE
 
         capacities = await self.paginated_request("capacities")
-        _CAPACITIES_CACHE[cache_key] = capacities
+        _CAPACITIES_CACHE = capacities
         return capacities
 
     async def get_job_instances(
@@ -461,6 +446,30 @@ class FabricApiClient:
 
         _SHORTCUTS_CACHE[cache_key] = all_shortcuts
         return all_shortcuts
+
+    async def get_environment_spark_config(
+        self, workspace_id: str, environment_id: str
+    ) -> Dict:
+        """Get Spark compute configuration for an environment"""
+        return await self._make_request(
+            f"workspaces/{workspace_id}/environments/{environment_id}/sparkcompute"
+        )
+
+    async def get_environment_libraries(
+        self, workspace_id: str, environment_id: str
+    ) -> Dict:
+        """Get installed libraries for an environment"""
+        return await self._make_request(
+            f"workspaces/{workspace_id}/environments/{environment_id}/libraries"
+        )
+
+    async def get_specific_shortcut(
+        self, workspace_id: str, item_id: str, shortcut_path: str, shortcut_name: str
+    ) -> Dict:
+        """Get details of a specific shortcut"""
+        path_segment = f"/{shortcut_path.strip('/')}" if shortcut_path else ""
+        endpoint = f"workspaces/{workspace_id}/items/{item_id}/shortcuts/{shortcut_name}{path_segment}"
+        return await self._make_request(endpoint)
 
 
 def is_valid_uuid(value: str) -> bool:
@@ -878,7 +887,7 @@ async def get_workspace(workspace: str) -> str:
         # Convert name to ID
         workspace_id = await client.resolve_workspace(workspace)
 
-        workspace_details = await client._make_request(f"workspaces/{workspace_id}")
+        workspace_details = await client.get_workspace_details(workspace_id)
 
         if not workspace_details:
             return f"Workspace '{workspace}' not found."
@@ -949,9 +958,7 @@ async def list_workspaces_with_identity() -> str:
         for workspace in workspaces:
             try:
                 # Try to get workspace details which might include identity info
-                workspace_details = await client._make_request(
-                    f"workspaces/{workspace['id']}"
-                )
+                workspace_details = await client.get_workspace_details(workspace["id"])
 
                 # Check if workspace has identity-related properties
                 # Note: The exact property name may vary based on API response
@@ -1029,7 +1036,7 @@ async def get_workspace_identity(workspace: str) -> str:
         # Convert name to ID
         workspace_id = await client.resolve_workspace(workspace)
 
-        workspace_details = await client._make_request(f"workspaces/{workspace_id}")
+        workspace_details = await client.get_workspace_details(workspace_id)
 
         if not workspace_details:
             return f"Workspace '{workspace}' not found."
@@ -1104,7 +1111,7 @@ async def list_shortcuts(
         workspace_id = await client.resolve_workspace(workspace)
 
         # Get all items to find the specified item
-        items = await client.paginated_request(f"workspaces/{workspace_id}/items")
+        items = await client.get_items(workspace_id)
 
         # Find the target item
         target_item = None
@@ -1204,7 +1211,7 @@ async def get_shortcut(
         workspace_id = await client.resolve_workspace(workspace)
 
         # Get all items to find the specified item
-        items = await client.paginated_request(f"workspaces/{workspace_id}/items")
+        items = await client.get_items(workspace_id)
 
         # Find the target item
         target_item = None
@@ -1220,8 +1227,9 @@ async def get_shortcut(
             return f"Item '{item_name}' not found in workspace '{workspace}'."
 
         # Get shortcut details
-        endpoint = f"workspaces/{workspace_id}/items/{target_item['id']}/shortcuts/{shortcut_path}/{shortcut_name}"
-        shortcut = await client._make_request(endpoint)
+        shortcut = await client.get_specific_shortcut(
+            workspace_id, target_item["id"], shortcut_path, shortcut_name
+        )
 
         if not shortcut:
             return f"Shortcut '{shortcut_name}' not found at path '{shortcut_path}' in item '{item_name}'."
@@ -1328,7 +1336,7 @@ async def list_workspace_shortcuts(workspace: str) -> str:
         workspace_id = await client.resolve_workspace(workspace)
 
         # Get all items in workspace that can contain shortcuts
-        items = await client.paginated_request(f"workspaces/{workspace_id}/items")
+        items = await client.get_items(workspace_id)
 
         # Filter to items that can contain shortcuts (Lakehouse, KQLDatabase)
         shortcut_items = [
@@ -1535,7 +1543,7 @@ async def get_job_instance(workspace: str, item_name: str, job_instance_id: str)
         workspace_id = await client.resolve_workspace(workspace)
 
         # Get all items to find the specified item
-        items = await client.paginated_request(f"workspaces/{workspace_id}/items")
+        items = await client.get_items(workspace_id)
         item = None
         for i in items:
             if item_name.lower() in i["displayName"].lower() or i["id"] == item_name:
@@ -1546,9 +1554,7 @@ async def get_job_instance(workspace: str, item_name: str, job_instance_id: str)
             return f"Item '{item_name}' not found in workspace '{workspace}'."
 
         # Get job instance details
-        job = await client._make_request(
-            f"workspaces/{workspace_id}/items/{item['id']}/jobs/instances/{job_instance_id}"
-        )
+        job = await client.get_job_instance(workspace_id, item["id"], job_instance_id)
 
         markdown = f"# Job Instance Details\n\n"
         markdown += f"**Item**: {item['displayName']} ({item['type']})\n"
@@ -1594,7 +1600,7 @@ async def list_item_schedules(workspace: str, item_name: str) -> str:
         workspace_id = await client.resolve_workspace(workspace)
 
         # Get all items to find the specified item
-        items = await client.paginated_request(f"workspaces/{workspace_id}/items")
+        items = await client.get_items(workspace_id)
         item = None
         for i in items:
             if item_name.lower() in i["displayName"].lower() or i["id"] == item_name:
@@ -1605,9 +1611,7 @@ async def list_item_schedules(workspace: str, item_name: str) -> str:
             return f"Item '{item_name}' not found in workspace '{workspace}'."
 
         # Get schedules for the item
-        schedules = await client.paginated_request(
-            f"workspaces/{workspace_id}/items/{item['id']}/schedules"
-        )
+        schedules = await client.get_item_schedules(workspace_id, item["id"])
 
         if not schedules:
             return f"No schedules found for item '{item['displayName']}'."
@@ -1657,7 +1661,7 @@ async def list_workspace_schedules(workspace: str) -> str:
         workspace_id = await client.resolve_workspace(workspace)
 
         # Get all items in workspace
-        items = await client.paginated_request(f"workspaces/{workspace_id}/items")
+        items = await client.get_items(workspace_id)
 
         if not items:
             return f"No items found in workspace '{workspace}'."
@@ -1667,9 +1671,7 @@ async def list_workspace_schedules(workspace: str) -> str:
         # Get schedules for each item
         for item in items:
             try:
-                schedules = await client.paginated_request(
-                    f"workspaces/{workspace_id}/items/{item['id']}/schedules"
-                )
+                schedules = await client.get_item_schedules(workspace_id, item["id"])
                 if schedules:
                     for schedule in schedules:
                         schedule["itemName"] = item["displayName"]
@@ -1732,20 +1734,16 @@ async def list_environments(workspace: str = None) -> str:
         if workspace:
             # Get environments for specific workspace
             workspace_id = await client.resolve_workspace(workspace)
-            environments = await client.paginated_request(
-                f"workspaces/{workspace_id}/items", params={"type": "Environment"}
-            )
+            environments = await client.get_environments(workspace_id)
             workspace_filter = f" in workspace '{workspace}'"
         else:
             # Get all accessible workspaces and their environments
-            workspaces = await client.paginated_request("workspaces")
+            workspaces = await client.get_workspaces()
             environments = []
 
             for ws in workspaces:
                 try:
-                    ws_environments = await client.paginated_request(
-                        f"workspaces/{ws['id']}/items", params={"type": "Environment"}
-                    )
+                    ws_environments = await client.get_environments(ws["id"])
                     for env in ws_environments:
                         env["workspaceName"] = ws["displayName"]
                         environments.append(env)
@@ -1796,9 +1794,7 @@ async def get_environment_details(workspace: str, environment_name: str) -> str:
         workspace_id = await client.resolve_workspace(workspace)
 
         # Find the environment
-        environments = await client.paginated_request(
-            f"workspaces/{workspace_id}/items", params={"type": "Environment"}
-        )
+        environments = await client.get_environments(workspace_id)
         environment = None
         for env in environments:
             if (
@@ -1820,8 +1816,8 @@ async def get_environment_details(workspace: str, environment_name: str) -> str:
 
         # Get Spark compute configuration
         try:
-            spark_config = await client._make_request(
-                f"workspaces/{workspace_id}/environments/{environment['id']}/sparkcompute"
+            spark_config = await client.get_environment_spark_config(
+                workspace_id, environment["id"]
             )
 
             markdown += "## Spark Compute Configuration\n"
@@ -1857,8 +1853,8 @@ async def get_environment_details(workspace: str, environment_name: str) -> str:
 
         # Get libraries
         try:
-            libraries = await client._make_request(
-                f"workspaces/{workspace_id}/environments/{environment['id']}/libraries"
+            libraries = await client.get_environment_libraries(
+                workspace_id, environment["id"]
             )
 
             if libraries and libraries.get("libraries"):
@@ -1931,19 +1927,18 @@ async def list_compute_usage(workspace: str = None, time_range_hours: int = 24) 
             workspaces_to_check = [{"id": workspace_id, "displayName": workspace}]
         else:
             # All workspaces
-            workspaces_to_check = await client.paginated_request("workspaces")
+            workspaces_to_check = await client.get_workspaces()
 
         for ws in workspaces_to_check:
             try:
                 # Get items in workspace
-                items = await client.paginated_request(f"workspaces/{ws['id']}/items")
+                items = await client.get_items(ws["id"])
 
                 for item in items:
                     try:
                         # Get active job instances
-                        jobs = await client.paginated_request(
-                            f"workspaces/{ws['id']}/items/{item['id']}/jobs/instances",
-                            params={"status": "InProgress"},  # Only active jobs
+                        jobs = await client.get_job_instances(
+                            ws["id"], item["id"], "InProgress"
                         )
 
                         for job in jobs:
@@ -2038,7 +2033,7 @@ async def get_item_lineage(workspace: str, item_name: str) -> str:
         workspace_id = await client.resolve_workspace(workspace)
 
         # Find the target item
-        items = await client.paginated_request(f"workspaces/{workspace_id}/items")
+        items = await client.get_items(workspace_id)
         target_item = None
         for item in items:
             if (
@@ -2063,9 +2058,7 @@ async def get_item_lineage(workspace: str, item_name: str) -> str:
         # Get all shortcuts if this is a lakehouse
         if target_item["type"] == "Lakehouse":
             try:
-                shortcuts = await client.paginated_request(
-                    f"workspaces/{workspace_id}/items/{target_item['id']}/shortcuts"
-                )
+                shortcuts = await client.get_shortcuts(workspace_id, target_item["id"])
                 if shortcuts:
                     markdown += "## Data Sources (via OneLake Shortcuts)\n"
                     for shortcut in shortcuts:
@@ -2202,7 +2195,7 @@ async def list_item_dependencies(workspace: str, item_type: str = None) -> str:
         workspace_id = await client.resolve_workspace(workspace)
 
         # Get all items in workspace
-        items = await client.paginated_request(f"workspaces/{workspace_id}/items")
+        items = await client.get_items(workspace_id)
 
         if not items:
             return f"No items found in workspace '{workspace}'."
@@ -2231,9 +2224,7 @@ async def list_item_dependencies(workspace: str, item_type: str = None) -> str:
             # Check for shortcuts (data dependencies)
             if item["type"] == "Lakehouse":
                 try:
-                    shortcuts = await client.paginated_request(
-                        f"workspaces/{workspace_id}/items/{item['id']}/shortcuts"
-                    )
+                    shortcuts = await client.get_shortcuts(workspace_id, item["id"])
                     for shortcut in shortcuts:
                         target = shortcut.get("target", {})
                         if target.get("lakehouse"):
@@ -2379,7 +2370,7 @@ async def get_data_source_usage(
         markdown = f"# Data Source Usage Analysis\n\n"
 
         # Get connections
-        connections = await client.paginated_request("connections")
+        connections = await client.get_connections()
 
         if connection_name:
             # Filter to specific connection
@@ -2397,7 +2388,7 @@ async def get_data_source_usage(
             workspaces_to_check = [{"id": workspace_id, "displayName": workspace}]
             markdown += f"**Workspace Filter**: {workspace}\n"
         else:
-            workspaces_to_check = await client.paginated_request("workspaces")
+            workspaces_to_check = await client.get_workspaces()
             markdown += f"**Scope**: All accessible workspaces\n"
 
         markdown += f"**Connections Found**: {len(connections)}\n\n"
@@ -2415,9 +2406,7 @@ async def get_data_source_usage(
             # Check usage across workspaces
             for ws in workspaces_to_check:
                 try:
-                    items = await client.paginated_request(
-                        f"workspaces/{ws['id']}/items"
-                    )
+                    items = await client.get_items(ws["id"])
 
                     for item in items:
                         # Items that commonly use connections
@@ -2549,11 +2538,16 @@ async def clear_fabric_data_cache(show_stats: bool = True) -> str:
         cleared_caches = []
         cache_stats = []
 
-        # Collect cache stats and clear TTL-based data caches
-        cache_info = [
+        # Handle simple list caches and TTL caches separately
+        global _WORKSPACE_CACHE, _CONNECTIONS_CACHE, _CAPACITIES_CACHE
+
+        simple_caches = [
             ("Workspace list", _WORKSPACE_CACHE, "workspaces"),
             ("Connections list", _CONNECTIONS_CACHE, "connections"),
             ("Capacities list", _CAPACITIES_CACHE, "capacities"),
+        ]
+
+        ttl_caches = [
             ("Items lists", _ITEMS_CACHE, "workspace items"),
             ("Shortcuts lists", _SHORTCUTS_CACHE, "item shortcuts"),
             ("Job instances", _JOB_INSTANCES_CACHE, "job instances"),
@@ -2566,7 +2560,14 @@ async def clear_fabric_data_cache(show_stats: bool = True) -> str:
             markdown += "| Cache Type | Entries | TTL (seconds) | Description |\n"
             markdown += "|------------|---------|---------------|-------------|\n"
 
-            for name, cache, desc in cache_info:
+            # Show simple cache stats
+            for name, cache, desc in simple_caches:
+                entries = len(cache) if cache is not None else 0
+                markdown += f"| {name} | {entries} | N/A | {desc} |\n"
+                cache_stats.append((name, entries))
+
+            # Show TTL cache stats
+            for name, cache, desc in ttl_caches:
                 entries = len(cache)
                 ttl = cache.ttl if hasattr(cache, "ttl") else "N/A"
                 markdown += f"| {name} | {entries} | {ttl} | {desc} |\n"
@@ -2574,8 +2575,19 @@ async def clear_fabric_data_cache(show_stats: bool = True) -> str:
 
             markdown += "\n"
 
-        # Clear all TTL caches
-        for name, cache, desc in cache_info:
+        # Clear simple list caches
+        for name, cache, desc in simple_caches:
+            if cache is not None:
+                size = len(cache)
+                if size > 0:
+                    cleared_caches.append(f"{name} ({size} entries)")
+
+        _WORKSPACE_CACHE = None
+        _CONNECTIONS_CACHE = None
+        _CAPACITIES_CACHE = None
+
+        # Clear TTL caches
+        for name, cache, desc in ttl_caches:
             size = len(cache)
             cache.clear()
             if size > 0:
@@ -2624,8 +2636,8 @@ async def clear_name_resolution_cache(show_stats: bool = True) -> str:
         markdown = "# 🔄 Name Resolution Cache Management\n\n"
 
         if show_stats:
-            workspace_count = len(_global_workspace_cache)
-            lakehouse_count = len(_global_lakehouse_cache)
+            workspace_count = len(_WORKSPACE_NAME_TO_ID_CACHE)
+            lakehouse_count = len(_LAKEHOUSE_NAME_TO_ID_CACHE)
 
             markdown += "## 📊 Current Cache Statistics\n\n"
             markdown += (
@@ -2637,7 +2649,7 @@ async def clear_name_resolution_cache(show_stats: bool = True) -> str:
 
             if workspace_count > 0:
                 markdown += "### Workspace Mappings\n"
-                for name, workspace_id in list(_global_workspace_cache.items())[
+                for name, workspace_id in list(_WORKSPACE_NAME_TO_ID_CACHE.items())[
                     :10
                 ]:  # Show first 10
                     display_name = name if len(name) <= 30 else f"{name[:27]}..."
@@ -2653,9 +2665,9 @@ async def clear_name_resolution_cache(show_stats: bool = True) -> str:
 
             if lakehouse_count > 0:
                 markdown += "### Lakehouse Mappings\n"
-                for cache_key, lakehouse_id in list(_global_lakehouse_cache.items())[
-                    :10
-                ]:  # Show first 10
+                for cache_key, lakehouse_id in list(
+                    _LAKEHOUSE_NAME_TO_ID_CACHE.items()
+                )[:10]:  # Show first 10
                     display_key = (
                         cache_key if len(cache_key) <= 40 else f"{cache_key[:37]}..."
                     )
@@ -2670,11 +2682,11 @@ async def clear_name_resolution_cache(show_stats: bool = True) -> str:
                 markdown += "\n"
 
         # Clear the caches
-        workspace_cleared = len(_global_workspace_cache)
-        lakehouse_cleared = len(_global_lakehouse_cache)
+        workspace_cleared = len(_WORKSPACE_NAME_TO_ID_CACHE)
+        lakehouse_cleared = len(_LAKEHOUSE_NAME_TO_ID_CACHE)
 
-        _global_workspace_cache.clear()
-        _global_lakehouse_cache.clear()
+        _WORKSPACE_NAME_TO_ID_CACHE.clear()
+        _LAKEHOUSE_NAME_TO_ID_CACHE.clear()
 
         markdown += "## ✅ Caches Cleared\n\n"
         markdown += (
